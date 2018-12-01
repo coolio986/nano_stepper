@@ -18,6 +18,9 @@ sCmdUart UsbUart;
 sCmdUart SerialUart;
 sCmdUart HostUart; //uart on the step/dir pins
 
+unsigned long previousMillis;//for getrpm command
+uint64_t previousSteps;//for getrpm command
+
 static int isPowerOfTwo (unsigned int x)
 {
 	while (((x % 2) == 0) && x > 1) /* While x is even and > 1 */
@@ -64,6 +67,7 @@ CMD_STR(boot, "Enters the bootloader");
 CMD_STR(move, "moves encoder to absolute angle in degrees 'move 400.1'");
 //CMD_STR(printdata, "prints last n error terms");
 CMD_STR(velocity, "gets/set velocity in RPMs");
+CMD_STR(getrpm, "gets rpm of motor output shaft as decimal integer");
 CMD_STR(factoryreset, "resets board to factory defaults");
 CMD_STR(stop, "stops the motion planner");
 CMD_STR(setzero, "set the reference angle to zero");
@@ -122,6 +126,7 @@ sCommand Cmds[] =
 		COMMAND(move),
 		//COMMAND(printdata),
 		COMMAND(velocity),
+    COMMAND(getrpm),
 		COMMAND(factoryreset),
 		COMMAND(stop),
 		COMMAND(setzero),
@@ -988,6 +993,28 @@ static int velocity_cmd(sCmdUart *ptrUart,int argc, char * argv[])
 	CommandPrintf(ptrUart,"Velocity is %d.%02d - %d\n\r",(int32_t)(x/100),(int32_t)y,(int32_t)stepperCtrl.getVelocity());
 
 	return 0;
+}
+static int getrpm_cmd(sCmdUart *ptrUart,int argc, char * argv[])
+{
+  if (argc == 0){
+    if (previousMillis != 0)
+    {
+      uint32_t x = NVM->motorParams.fullStepsPerRotation;
+      uint32_t y = NVM->SystemParams.microsteps;
+
+      unsigned long timeDifference = millis() - previousMillis;
+      int64_t currentSteps = getSteps();
+      int64_t stepDifference = previousSteps - currentSteps;
+      float rpm = (float)(stepDifference / (int64_t)(x * y)) * (float)((unsigned long)60000 / timeDifference);
+      //int64_t test = (3200 / (200 * 16)) * (60 / (100 / 1000));
+      CommandPrintf(ptrUart, "$d.$02d", rpm);
+    }
+
+    previousMillis = millis();
+    previousSteps = getSteps();
+  }
+  
+  return 0;
 }
 
 //
